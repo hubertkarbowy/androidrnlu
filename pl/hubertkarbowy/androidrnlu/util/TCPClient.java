@@ -1,5 +1,7 @@
 package pl.hubertkarbowy.androidrnlu.util;
 
+import android.content.SharedPreferences;
+import android.preference.PreferenceManager;
 import android.util.Log;
 
 import pl.hubertkarbowy.androidrnlu.MainActivity;
@@ -14,8 +16,6 @@ import java.net.Socket;
 
 import android.os.Handler;
 
-import static pl.hubertkarbowy.androidrnlu.util.SimpleRnluClientSettings.*;
-
 /**
  * Created by hubert on 15.04.18.
  */
@@ -28,6 +28,10 @@ public class TCPClient {
     private String nlIntent = null;
     private Handler handler;
     private MainActivity a = null;
+    private SharedPreferences prefs;
+    private String serverIp;
+    private int serverPort;
+    private String currentLocale = "pl_PL";
     // tutaj mapa z kontekstem klienta
 
 
@@ -35,6 +39,10 @@ public class TCPClient {
         this.nlIntent=nlIntent;
         this.handler=handler;
         this.a=a;
+        prefs = PreferenceManager.getDefaultSharedPreferences(a.getApplicationContext());
+        serverIp = prefs.getString("server_addr", "192.168.1.14");
+        serverPort = Integer.parseInt(prefs.getString("server_port", "55100"));
+        currentLocale = prefs.getString("culture", "pl_PL");
     }
 
     public class ConnectRunnable implements Runnable {
@@ -54,8 +62,8 @@ public class TCPClient {
                 br.readLine(); // protocol info
                 br.readLine(); // protocol info
 
-                pw.println("pl_PL");
-                pw.flush();
+                pw.println(currentLocale);
+                pw.flush(); // TODO: 1) w serwerze ACK + readLine, 2) Sprawdzenie czy ACK czy unsupported culture
                 pw.println("/def"); // tu bedziemy dawac /sc i parametry
                 pw.flush();
                 pw.println("/cmd " + nlIntent);
