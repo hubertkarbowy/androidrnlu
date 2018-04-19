@@ -56,7 +56,7 @@ public class TCPClient {
                 PrintWriter pw = new PrintWriter(os);
                 String line;
                 StringBuffer sb = new StringBuffer();
-                final String decodedIntent;
+                final String decodedNlIntentAndSlots;
                 final String displayAndSpokenText;
                 line = br.readLine(); // Resp: SimpleRnlu Server
                 br.readLine(); // protocol info
@@ -68,7 +68,7 @@ public class TCPClient {
                 pw.flush();
                 pw.println("/cmd " + nlIntent);
                 pw.flush();
-                decodedIntent = br.readLine();
+                decodedNlIntentAndSlots = br.readLine();
                 displayAndSpokenText = br.readLine();
                 pw.println("/q");
                 pw.flush();
@@ -78,7 +78,12 @@ public class TCPClient {
                     @Override
                     public void run() {
                         a.setAndReadResponse(ServerResponses.extractDisplayText(displayAndSpokenText),
-                                             ServerResponses.extractSpokenText(displayAndSpokenText));
+                                ServerResponses.extractSpokenText(displayAndSpokenText),
+                                ServerResponses.extractNlIntent(decodedNlIntentAndSlots),
+                                ServerResponses.extractNlSlots(decodedNlIntentAndSlots));
+
+//                        a.executeIntent(ServerResponses.extractNlIntent(decodedNlIntentAndSlots),
+//                                        ServerResponses.extractNlSlots(decodedNlIntentAndSlots));
                     }
                 });
 
@@ -88,7 +93,7 @@ public class TCPClient {
                 handler.post(new Runnable() {
                     @Override
                     public void run() {
-                        a.setAndReadResponse("Ups, coś nie poszło.", "Czynność niedostępna."); // TODO: Externalize strings
+                        a.setAndReadResponse("Ups, coś nie poszło.", "Czynność niedostępna.", "nothing", null); // TODO: Externalize strings
                     }
                 });
             }

@@ -1,10 +1,12 @@
 package pl.hubertkarbowy.androidrnlu;
 
 import android.content.ActivityNotFoundException;
+import android.content.Context;
 import android.content.Intent;
 import android.os.Handler;
 import android.speech.RecognizerIntent;
 import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -16,9 +18,13 @@ import android.widget.Toast;
 import com.example.hubert.myapplication.R;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 
 import pl.hubertkarbowy.androidrnlu.config.SettingsHelperMethods;
+import pl.hubertkarbowy.androidrnlu.nativeapps.NativeApps;
+import pl.hubertkarbowy.androidrnlu.util.ServerResponses;
 import pl.hubertkarbowy.androidrnlu.util.TCPClient;
 import pl.hubertkarbowy.androidrnlu.util.TTSUtils;
 
@@ -104,14 +110,70 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void ttsTest(View view) {
-        ttsobj.speak("Próba asystenta.", TextToSpeech.QUEUE_FLUSH, null);
+        ttsobj.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+            @Override
+            public void onStart(String s) {
+                // Toast.makeText(getApplicationContext(), "Poczatek!",Toast.LENGTH_SHORT).show();
+                Log.d("TTSOUT", "Poczatek");
+            }
+
+            @Override
+            public void onDone(String s) {
+
+                               // Toast.makeText(getApplicationContext(), "Przeczytano!",Toast.LENGTH_SHORT).show();
+                                Log.d("TTSOUT","Gotowe");
+
+            }
+
+            @Override
+            public void onError(String s) {
+
+            }
+        });
+
+        HashMap<String, String> dummyMap = new HashMap<>();
+        dummyMap.put(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, "UniqueID");
+        ttsobj.speak("Próba asystenta.", TextToSpeech.QUEUE_FLUSH, dummyMap);
     }
 
-    public void setAndReadResponse(String displayText, String spokenText) {
-        servResponse.setText(displayText);
-        ttsobj.speak(spokenText, TextToSpeech.QUEUE_FLUSH, null);
+    public void setAndReadResponse(String displayText, String spokenText, String nlRecognizedIntentFromServer, final Map<String, String> nlParams) {
+        Locale responseLocale = new Locale(SettingsHelperMethods.readPrefs(this, "culture", "pl_PL"));
+        Intent preTest = NativeApps.fetchIntent(nlRecognizedIntentFromServer, nlParams);
+        boolean isIntentExists = false;
+        if (preTest != null && preTest.resolveActivity(getPackageManager()) != null) isIntentExists=true;
+//        boolean isIntentExists = preTest.resolveActivity(getPackageManager()) == null ? false : true;
+        final String effectiveNlIntent = isIntentExists ? nlRecognizedIntentFromServer : "NoOp";
+        String effectiveDisplayText = ServerResponses.getEffectiveSpokenText(spokenText, nlRecognizedIntentFromServer, nlParams, isIntentExists);
+        String effectiveSpokenText = ServerResponses.getEffectiveSpokenText(spokenText, nlRecognizedIntentFromServer, nlParams, isIntentExists);
 
-        Log.d("DISPLAYTEXT", displayText);
-        Log.d("SPOKENTEXT", spokenText);
+
+        servResponse.setText(effectiveDisplayText);
+        HashMap<String, String> dummyMap = new HashMap<>();
+        dummyMap.put(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, "GoGetIt");
+        ttsobj.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+            @Override
+            public void onStart(String s) {
+
+            }
+
+            @Override
+            public void onDone(String s) {
+                executeIntent(effectiveNlIntent, nlParams);
+            }
+
+            @Override
+            public void onError(String s) {
+
+            }
+        });
+        ttsobj.speak(effectiveSpokenText, TextToSpeech.QUEUE_FLUSH, dummyMap);
+
+        Log.d("DISPLAYTEXT", effectiveDisplayText);
+        Log.d("SPOKENTEXT", effectiveSpokenText);
+    }
+
+    public void executeIntent(String nlRecognizedIntent, Map<String, String> nlParams) {
+        Intent foundAction = NativeApps.fetchIntent(nlRecognizedIntent, nlParams);
+        if (foundAction.resolveActivity(getPackageManager())!=null) startActivity(foundAction);
     }
 }
