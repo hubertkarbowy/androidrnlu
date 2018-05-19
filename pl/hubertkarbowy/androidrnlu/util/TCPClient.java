@@ -16,6 +16,8 @@ import java.net.Socket;
 
 import android.os.Handler;
 
+import com.example.hubert.myapplication.R;
+
 /**
  * Created by hubert on 15.04.18.
  */
@@ -32,10 +34,17 @@ public class TCPClient {
     private String serverIp;
     private int serverPort;
     private String currentLocale = "pl_PL";
+    private boolean isNlIntentPreformatted = false;
+
+    private FulfilledIntent nluResult;
     // tutaj mapa z kontekstem klienta
 
 
     public TCPClient(String nlIntent, Handler handler, MainActivity a) {
+        this(nlIntent, handler, a, false);
+    }
+
+    public TCPClient(String nlIntent, Handler handler, MainActivity a, boolean preformattingFlag) {
         this.nlIntent=nlIntent;
         this.handler=handler;
         this.a=a;
@@ -43,6 +52,7 @@ public class TCPClient {
         serverIp = prefs.getString("server_addr", "192.168.1.14");
         serverPort = Integer.parseInt(prefs.getString("server_port", "55100"));
         currentLocale = prefs.getString("culture", "pl_PL");
+        this.isNlIntentPreformatted = preformattingFlag;
     }
 
     public class ConnectRunnable implements Runnable {
@@ -66,42 +76,56 @@ public class TCPClient {
                 pw.flush(); // TODO: 1) w serwerze ACK + readLine, 2) Sprawdzenie czy ACK czy unsupported culture
                 pw.println("/def"); // tu bedziemy dawac /sc i parametry
                 pw.flush();
-                pw.println("/cmd " + nlIntent);
+                if (isNlIntentPreformatted) pw.println(nlIntent);
+                else pw.println("/cmd " + nlIntent);
                 pw.flush();
                 decodedNlIntentAndSlots = br.readLine();
                 displayAndSpokenText = br.readLine();
                 pw.println("/q");
                 pw.flush();
-                Log.d(TAG, "Odpowiedź: " + displayAndSpokenText);
+                Log.d(TAG, "Response: " + displayAndSpokenText);
+                nluResult = new FulfilledIntent(ServerResponses.extractDisplayText(displayAndSpokenText),
+                        ServerResponses.extractSpokenText(displayAndSpokenText),
+                        ServerResponses.extractNlIntent(decodedNlIntentAndSlots),
+                        ServerResponses.extractNlSlots(decodedNlIntentAndSlots),
+                        decodedNlIntentAndSlots.contains("ELICITATION_ACTION") ? true : false);
 
-                handler.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        a.setAndReadResponse(ServerResponses.extractDisplayText(displayAndSpokenText),
-                                ServerResponses.extractSpokenText(displayAndSpokenText),
-                                ServerResponses.extractNlIntent(decodedNlIntentAndSlots),
-                                ServerResponses.extractNlSlots(decodedNlIntentAndSlots));
-
-//                        a.executeIntent(ServerResponses.extractNlIntent(decodedNlIntentAndSlots),
-//                                        ServerResponses.extractNlSlots(decodedNlIntentAndSlots));
-                    }
-                });
+//                handler.post(new Runnable() {
+//                    @Override
+//                    public void run() {
+//                        a.setAndReadResponse(ServerResponses.extractDisplayText(displayAndSpokenText),
+//                                ServerResponses.extractSpokenText(displayAndSpokenText),
+//                                ServerResponses.extractNlIntent(decodedNlIntentAndSlots),
+//                                ServerResponses.extractNlSlots(decodedNlIntentAndSlots));
+//
+////                        a.executeIntent(ServerResponses.extractNlIntent(decodedNlIntentAndSlots),
+////                                        ServerResponses.extractNlSlots(decodedNlIntentAndSlots));
+//                    }
+//                });
 
                 connectionSocket.close();
 
             } catch (Exception e) {
-                handler.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        a.setAndReadResponse("Ups, coś nie poszło.", "Czynność niedostępna.", "nothing", null); // TODO: Externalize strings
-                    }
-                });
+                nluResult = new FulfilledIntent("Network error", "Network error", "NoOp", null, false);
+//                handler.post(new Runnable() {
+//                    @Override
+//                    public void run() {
+//                        a.setAndReadResponse(a.getString(R.string.networkError), a.getString(R.string.networkError), "NoOp", null);
+//                    }
+//                });
             }
         }
     }
 
-    public void sendQuery() {
-        new Thread(new ConnectRunnable()).start();
+    public FulfilledIntent sendQuery() {
+        Thread t = new Thread(new ConnectRunnable());
+        t.start();
+        try {
+            t.join();
+        }
+        catch (InterruptedException e) {}
+        Log.d("KONIEC", "Tu sie konczy");
+        return nluResult;
     }
 
 }

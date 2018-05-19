@@ -2,6 +2,8 @@ package pl.hubertkarbowy.androidrnlu.util;
 
 import android.content.Context;
 
+import com.example.hubert.myapplication.R;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -14,6 +16,10 @@ import java.util.regex.Pattern;
  */
 
 public class ServerResponses {
+
+    public static int NO_ANDROID_INTENT = 0;
+    public static int ANDROID_INTENT_FULFILLED = 1;
+    public static int ANDROID_INTENT_ELICITATION = 2;
 
     public static String extractDisplayText(String serverResponse) {
         Pattern p = Pattern.compile("\\{DISPLAYTEXT:(.*?)\\}");
@@ -52,14 +58,25 @@ public class ServerResponses {
         return slots;
     }
 
-    public static String getEffectiveSpokenText (String spokenText, String nlRecognizedIntentFromServer, Map<String, String> nlParams, boolean isIntentExists) {
+    public static String getEffectiveSpokenText (String spokenText, String nlRecognizedIntentFromServer, Map<String, String> nlParams, int isIntentExists, Context ctxt) {
         if (!spokenText.equals("*DELEGATED*")) return spokenText;
         else {
             if (nlRecognizedIntentFromServer.equals("AppLaunch")) {
-                if (!isIntentExists) return "Nie mogę uruchomić tego polecenia na tej wersji telefonu"; // TODO KONIECZNIE: Externalize strings!
-                else return "OK, uruchamiam " + nlParams.get("AppName"); // TODO KONIECZNIE: Externalize strings!
+                if (isIntentExists==NO_ANDROID_INTENT) return ctxt.getString(R.string.noSuchAndroidIntent_S);
+                else return ctxt.getString(R.string.nowRunning);
             }
-            else return "Nie mogę delegować odpowiedzi do tej komendy"; // TODO KONIECZNIE: Externalize strings!
+            else return ctxt.getString(R.string.responseDelegationError);
+        }
+    }
+
+    public static String getEffectiveDisplayText (String displayText, String nlRecognizedIntentFromServer, Map<String, String> nlParams, int isIntentExists, Context ctxt) {
+        if (!displayText.equals("*DELEGATED*")) return displayText;
+        else {
+            if (nlRecognizedIntentFromServer.equals("AppLaunch")) {
+                if (isIntentExists==NO_ANDROID_INTENT) return ctxt.getString(R.string.noSuchAndroidIntent_D);
+                else return ctxt.getString(R.string.nowRunning) + " " + nlParams.get("AppName");
+            }
+            else return ctxt.getString(R.string.responseDelegationError);
         }
     }
 }
